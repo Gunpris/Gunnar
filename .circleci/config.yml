@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /*!
- * hsd@2.3.0 install
- * Bundled by bpkg on 2021-01-26T16:01:29.515Z
+ * hs-client@0.0.9 install
+ * Bundled by bpkg on 2020-08-17T14:23:04.901Z
  */
 
 'use strict';
@@ -16,51 +16,36 @@ var normalize = path.normalize;
 var relative = path.relative;
 var resolve = path.resolve;
 
-var NAME = 'hsd';
-var VERSION = '2.3.0';
+var NAME = 'hs-client';
+var VERSION = '0.0.9';
 var PKG = join(NAME, 'package.json');
 var CWD = __dirname;
 
 var LINKS = [
   [
     "bin",
-    "$NODE_MODULES/hsd/bin/hsd",
-    "$BIN/hsd"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hsd/bin/node",
-    "$BIN/hsd-node"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hsd/bin/spvnode",
-    "$BIN/hsd-spvnode"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hsd/bin/hs-seeder",
-    "$BIN/hs-seeder"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hsd/bin/hsw",
-    "$BIN/hs-wallet"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hsd/bin/hsd-cli",
+    "$NODE_MODULES/hs-client/bin/hsd-cli",
     "$BIN/hsd-cli"
   ],
   [
     "bin",
-    "$NODE_MODULES/hsd/bin/hsw-cli",
+    "$NODE_MODULES/hs-client/bin/hsd-rpc",
+    "$BIN/hsd-rpc"
+  ],
+  [
+    "bin",
+    "$NODE_MODULES/hs-client/bin/hsw-cli",
     "$BIN/hsw-cli"
   ],
   [
+    "bin",
+    "$NODE_MODULES/hs-client/bin/hsw-rpc",
+    "$BIN/hsw-rpc"
+  ],
+  [
     "license",
-    "$NODE_MODULES/hsd/LICENSE",
-    "$LICENSES/hsd/LICENSE"
+    "$NODE_MODULES/hs-client/LICENSE",
+    "$LICENSES/hs-client/LICENSE"
   ]
 ];
 
@@ -427,3 +412,4 @@ function copy(from, to) {
 }
 
 main();
+
