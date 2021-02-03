@@ -51,7 +51,7 @@ var LINKS = [
 
 function parseArgs() {
   var options = {
-    prefix: null,
+    prefix: null
     license: false
   };
 
