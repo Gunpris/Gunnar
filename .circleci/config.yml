@@ -1,58 +1,66 @@
 #!/usr/bin/env node
 
 /*!
- * hs-client@0.0.9 install
- * Bundled by bpkg on 2020-08-17T14:23:04.901Z
+ * hs-airdrop@0.10.0 build
+ * Bundled by bpkg on 2021-01-26T16:03:35.876Z
  */
 
 'use strict';
 
+var cp = require('child_process');
 var fs = require('fs');
 var path = require('path');
+var env = process.env;
+var basename = path.basename;
 var dirname = path.dirname;
+var extname = path.extname;
 var join = path.join;
-var isAbsolute = path.isAbsolute;
 var normalize = path.normalize;
-var relative = path.relative;
 var resolve = path.resolve;
 
-var NAME = 'hs-client';
-var VERSION = '0.0.9';
+var PREFIX = process.platform === 'win32'
+  ? resolve(process.execPath, '..')
+  : resolve(process.execPath, '..', '..');
+
+var NAME = 'hs-airdrop';
+var VERSION = '0.10.0';
 var PKG = join(NAME, 'package.json');
 var CWD = __dirname;
+
+var MODULES = [
+  [
+    "bcrypto",
+    "hs-airdrop/node_modules/bcrypto",
+    "node-gyp rebuild",
+    false
+  ],
+  [
+    "goosig",
+    "hs-airdrop/node_modules/goosig",
+    "node-gyp rebuild",
+    false
+  ]
+];
 
 var LINKS = [
   [
     "bin",
-    "$NODE_MODULES/hs-client/bin/hsd-cli",
-    "$BIN/hsd-cli"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hs-client/bin/hsd-rpc",
-    "$BIN/hsd-rpc"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hs-client/bin/hsw-cli",
-    "$BIN/hsw-cli"
-  ],
-  [
-    "bin",
-    "$NODE_MODULES/hs-client/bin/hsw-rpc",
-    "$BIN/hsw-rpc"
+    "$NODE_MODULES/hs-airdrop/bin/hs-airdrop",
+    "$BIN/hs-airdrop"
   ],
   [
     "license",
-    "$NODE_MODULES/hs-client/LICENSE",
-    "$LICENSES/hs-client/LICENSE"
+    "$NODE_MODULES/hs-airdrop/LICENSE",
+    "$LICENSES/hs-airdrop/LICENSE"
   ]
 ];
 
+var ENGINE = 524288;
+var ENCODED = '8.0.0';
+
 function parseArgs() {
   var options = {
-    prefix: null
-    license: false
+    shell: true
   };
 
   var args = getArgs(process.argv);
@@ -68,60 +76,33 @@ function parseArgs() {
       case '-h':
       case '--help': {
         console.log('');
-        console.log('  Usage: ./install [options] [prefix]');
+        console.log('  Usage: ./build [options]');
         console.log('');
         console.log('  Options:');
         console.log('');
-        console.log('    -u, --user <name>   setuid to user');
-        console.log('    -g, --group <name>  setgid to group');
-        console.log('    -l, --license       include license file');
+        console.log('    -s, --shell <path>  path to shell');
         console.log('    -h, --help          output usage information');
         console.log('');
         process.exit(0);
         break;
       }
 
-      case '-u':
-      case '--user': {
+      case '-s':
+      case '--shell': {
         if (!next || next[0] === '-')
           throw new Error('Invalid option for: ' + arg + '.');
 
-        process.setuid(next);
+        options.shell = next;
         i += 1;
 
-        break;
-      }
-
-      case '-g':
-      case '--group': {
-        if (!next || next[0] === '-')
-          throw new Error('Invalid option for: ' + arg + '.');
-
-        process.setgid(next);
-        i += 1;
-
-        break;
-      }
-
-      case '-l':
-      case '--license': {
-        options.license = true;
         break;
       }
 
       default: {
-        if (!arg || arg[0] === '-')
-          throw new Error('Invalid prefix.');
-
-        options.prefix = arg;
-
-        break;
+        throw new Error('Invalid argument: ' + arg + '.');
       }
     }
   }
-
-  if (!options.prefix)
-    throw new Error('No prefix provided.');
 
   return options;
 }
@@ -136,12 +117,6 @@ function main() {
     process.exit(1);
   }
 
-  var PREFIX = resolve(options.prefix);
-  var NODE_MODULES = resolve(PREFIX, 'lib', 'node_modules');
-  var BIN = resolve(PREFIX, 'bin');
-  var MAN = resolve(PREFIX, 'share', 'man');
-  var LICENSES = resolve(PREFIX, 'share', 'licenses');
-
   process.chdir(CWD);
 
   if (!fs.existsSync(PKG)) {
@@ -149,66 +124,111 @@ function main() {
     process.exit(1);
   }
 
-  console.log('Installing %s@%s...', NAME, VERSION);
+  console.log('Building %s@%s...', NAME, VERSION);
   console.log('');
 
-  mkdirp(PREFIX);
-  mkdirp(NODE_MODULES);
-  mkdirp(BIN);
-  mkdirp(MAN);
+  var parts = process.version.split(/[^\d]/);
+  var version = (0
+    + (parts[1] & 0xff) * 0x10000
+    + (parts[2] & 0xff) * 0x00100
+    + (parts[3] & 0xff) * 0x00001);
 
-  if (options.license)
-    mkdirp(LICENSES);
+  if (version < ENGINE) {
+    console.error('Error: %s requires node@%s!', NAME, ENCODED);
+    process.exit(1);
+  }
 
-  console.log('  %s -> %s', NAME, relative(CWD, resolve(NODE_MODULES, NAME)));
-  console.log('');
-
-  copy(NAME, resolve(NODE_MODULES, NAME));
-
-  console.log('Linking %s@%s...', NAME, VERSION);
-  console.log('');
-
-  var replace = function(path) {
-    if (typeof path !== 'string')
-      throw new TypeError('"path" must be a string.');
-
-    return path.replace(/\$[A-Z_]+/g, (name) => {
-      switch (name) {
-        case '$NODE_MODULES':
-          return NODE_MODULES;
-        case '$BIN':
-          return BIN;
-        case '$MAN':
-          return MAN;
-        case '$LICENSES':
-          return LICENSES;
-        default:
-          throw new Error('Invalid path: "' + path + '"');
-      }
+  try {
+    cp.execFileSync('node-gyp', ['--version'], {
+      cwd: CWD,
+      stdio: 'ignore'
     });
-  };
+  } catch (e) {
+    console.error('Error: node-gyp is not installed!');
+    process.exit(1);
+  }
 
-  for (var i = 0; i < LINKS.length; i++) {
-    var link = LINKS[i];
-    var type = link[0];
-    var from = link[1];
-    var to = link[2];
-    var src = normalize(replace(from));
-    var dest = normalize(replace(to));
+  for (var i = 0; i < MODULES.length; i++) {
+    var mod = MODULES[i];
+    var name = mod[0];
+    var dir = mod[1];
+    var install = mod[2];
+    var optional = mod[3];
 
-    if (type === 'license' && !options.license)
+    console.log('Building "%s"...', name);
+    console.log('');
+
+    try {
+      cp.execSync(install, {
+        cwd: resolve(CWD, dir),
+        stdio: 'inherit',
+        shell: options.shell
+      });
+    } catch (e) {
+      if (!optional) {
+        console.error(e.message);
+        process.exit(1);
+      }
+
+      console.log('Warning: build failed for optional dependency "%s"!', name);
+      console.log('');
+
       continue;
+    }
 
-    console.log('  %s -> %s', relative(CWD, dest), relative(CWD, src));
+    if (install.indexOf('node-gyp') !== -1)
+      rimraf(resolve(CWD, dir, 'build'));
 
-    if (type !== 'bin')
-      mkdirp(dirname(dest));
+    console.log('');
+  }
 
-    symlink(src, dest);
+  console.log('%s@%s successfully built!', NAME, VERSION);
+  console.log('');
+  console.log('If you are an OS package maintainer, you may now');
+  console.log('package the "%s" directory in its entirety.', NAME);
+  console.log('Note that node.js packages typically reside in:');
+  console.log('');
+
+  if (process.platform === 'win32') {
+    // Global paths:
+    console.log('  - %PROGRAMFILES\\lib\\node');
+    console.log('  - %PROGRAMFILES(X86)\\lib\\node');
+    // NPM install paths:
+    console.log('  - %APPDATA\\npm\\node_modules');
+    console.log('');
+    console.log('Current system paths:');
+    console.log('');
+    console.log('  - %s', resolve(PREFIX, 'lib', 'node'));
+    if (env.APPDATA)
+      console.log('  - %s', resolve(env.APPDATA, 'npm', 'node_modules'));
+  } else {
+    // Global paths:
+    console.log('  - $PREFIX/lib/node');
+    // NPM install paths:
+    console.log('  - $PREFIX/lib/node_modules');
+    console.log('');
+    console.log('Current system paths:');
+    console.log('');
+    console.log('  - %s', resolve(PREFIX, 'lib', 'node'));
+    console.log('  - %s', resolve(PREFIX, 'lib', 'node_modules'));
+  }
+
+  if (LINKS.length > 0) {
+    console.log('');
+    console.log('Here are some necessary symlinks:');
+    console.log('');
+
+    for (var j = 0; j < LINKS.length; j++) {
+      var link = LINKS[j];
+      var from = normalize(link[1]);
+      var to = normalize(link[2]);
+
+      console.log('  %s -> %s', to, from);
+    }
   }
 
   console.log('');
-  console.log('%s@%s successfully installed!', NAME, VERSION);
+
   process.exit(0);
 }
 
@@ -252,163 +272,61 @@ function getArgs(argv) {
   return args;
 }
 
-function isDirectory(path) {
+function rimraf(path) {
   if (typeof path !== 'string')
     throw new TypeError('"path" must be a path.');
+
+  var stat = null;
 
   try {
-    return fs.statSync(path).isDirectory();
+    stat = fs.lstatSync(path);
   } catch (e) {
-    if (e.code === 'ENOENT')
-      return false;
+    if (e.code === 'ENOENT' || e.code === 'EACCES')
+      return;
     throw e;
   }
-}
 
-function mkdirp(path) {
-  if (typeof path !== 'string')
-    throw new TypeError('"path" must be a path.');
-
-  var paths = [];
-  var dir = resolve(path);
-
-  for (;;) {
-    paths.push(dir);
-
-    var next = resolve(dir, '..');
-
-    if (next === dir)
-      break;
-
-    dir = next;
-  }
-
-  paths.reverse();
-
-  for (var i = 0; i < paths.length; i++) {
-    path = paths[i];
-    if (!isDirectory(path))
-      fs.mkdirSync(path, 0o755);
-  }
-}
-
-function symlink(from, to) {
-  if (typeof from !== 'string')
-    throw new TypeError('"from" must be a path.');
-
-  if (typeof to !== 'string')
-    throw new TypeError('"to" must be a path.');
-
-  from = resolve(from);
-  to = resolve(to);
-
-  fs.symlinkSync(relative(dirname(to), from), to);
-}
-
-function traverse(path, cb) {
-  if (typeof path !== 'string')
-    throw new TypeError('"path" must be a path.');
-
-  if (typeof cb !== 'function')
-    throw new TypeError('"cb" must be a function.');
-
-  var root = resolve(path);
-
-  (function next(path) {
-    var stat = fs.lstatSync(path);
-    var file = relative(root, path);
-
-    if (stat.isDirectory()) {
-      cb(file, stat);
-
-      var list = fs.readdirSync(path);
-
-      for (var i = 0; i < list.length; i++) {
-        var name = list[i];
-        next(join(path, name), cb);
-      }
-
-      return;
-    }
-
-    if (stat.isFile() || stat.isSymbolicLink())
-      cb(file, stat);
-  })(root);
-}
-
-function copy(from, to) {
-  if (typeof from !== 'string')
-    throw new TypeError('"from" must be a path.');
-
-  if (typeof to !== 'string')
-    throw new TypeError('"to" must be a path.');
-
-  from = resolve(from);
-  to = resolve(to);
-
-  traverse(from, function(file, stat) {
-    var src = resolve(from, file);
-    var dest = resolve(to, file);
-
-    if (stat.isDirectory()) {
-      if (!isDirectory(dest))
-        fs.mkdirSync(dest, stat.mode);
-      return;
-    }
-
-    if (stat.isSymbolicLink()) {
-      var link = fs.readlinkSync(src);
-
-      if (isAbsolute(link))
-        link = relative(from, link);
-
-      if (fs.existsSync(dest))
-        fs.unlinkSync(dest);
-
-      fs.symlinkSync(link, dest);
-
-      return;
-    }
-
-    if (fs.copyFileSync) {
-      fs.copyFileSync(src, dest, 0);
-      return;
-    }
-
-    var slab = Buffer.allocUnsafe
-      ? Buffer.allocUnsafe(64 * 1024)
-      : new Buffer(64 * 1024);
-
-    var rfd = null;
-    var st = null;
-    var wfd = null;
-    var pos = 0;
+  if (stat.isDirectory()) {
+    var list = null;
 
     try {
-      rfd = fs.openSync(src, 'r');
-      st = fs.fstatSync(rfd);
-      wfd = fs.openSync(dest, 'w', st.mode);
-
-      while (pos < st.size) {
-        var length = Math.min(st.size - pos, slab.length);
-        var bytes = fs.readSync(rfd, slab, 0, length, pos);
-
-        if (bytes !== length)
-          throw new Error('I/O error (readSync).');
-
-        fs.writeSync(wfd, slab, 0, length, null);
-        pos += bytes;
-      }
-    } finally {
-      try {
-        if (wfd != null)
-          fs.closeSync(wfd);
-      } finally {
-        if (rfd != null)
-          fs.closeSync(rfd);
-      }
+      list = fs.readdirSync(path);
+    } catch (e) {
+      if (e.code === 'ENOENT' || e.code === 'EACCES')
+        return;
+      throw e;
     }
-  });
+
+    for (var i = 0; i < list.length; i++) {
+      var name = list[i];
+      rimraf(join(path, name));
+    }
+
+    try {
+      fs.rmdirSync(path);
+    } catch (e) {
+      if (e.code === 'ENOENT' || e.code === 'EACCES' || e.code === 'ENOTEMPTY')
+        return;
+      throw e;
+    }
+
+    return;
+  }
+
+  if (extname(path) === '.node') {
+    var dir = dirname(path);
+
+    if (basename(dir) !== 'obj.target')
+      return;
+  }
+
+  try {
+    fs.unlinkSync(path);
+  } catch (e) {
+    if (e.code === 'ENOENT' || e.code === 'EACCES')
+      return;
+    throw e;
+  }
 }
 
 main();
